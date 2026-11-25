@@ -162,14 +162,12 @@ public class TravelTimeComputer {
 
             // Preserve past behavior: only apply bike or walk time limits when those modes are used to access transit.
             // The overall time limit specified in the request may further decrease that mode-specific limit.
-            {
-
-                int limitSeconds = request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
-                if (request.hasTransit() || enableOnDemand) {
-                    limitSeconds = Math.min(limitSeconds, request.getMaxTimeSeconds(accessMode));
-                }
-                sr.timeLimitSeconds = limitSeconds;
+            // The same limit is applied again below when finding direct travel time to the linked destinations.
+            int limitSeconds = request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
+            if (request.hasTransit() || enableOnDemand) {
+                limitSeconds = Math.min(limitSeconds, request.getMaxTimeSeconds(accessMode));
             }
+            sr.timeLimitSeconds = limitSeconds;
 
             // Even if generalized cost tags were present on the input data, we always minimize travel time.
             // The generalized cost calculations currently increment time and weight by the same amount.
@@ -237,11 +235,14 @@ public class TravelTimeComputer {
 
                 Split origin = sr.getOriginSplit();
 
+                // The street search applied a time limit only at street vertices.
+                // Apply it again here to the total time extended to each destination point.
                 PointSetTimes pointSetTimes = linkedDestinations.eval(
                         sr::getTravelTimeToVertex,
                         streetSpeedMillimetersPerSecond,
                         walkSpeedMillimetersPerSecond,
-                        origin
+                        origin,
+                        limitSeconds
                 );
 
                 if (onDemandAccess != null) {

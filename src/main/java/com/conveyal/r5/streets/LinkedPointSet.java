@@ -442,17 +442,24 @@ public class LinkedPointSet implements Serializable {
     }
 
 
+    /// When we don't want to impose a time limit when calling eval, use this constant.
+    public static final int NO_TIME_LIMIT = Integer.MAX_VALUE;
+
     @Deprecated
     public PointSetTimes eval (CostToVertexFunction travelTimeForVertex) {
         // R5 used to not differentiate between seconds and meters, preserve that behavior in this deprecated function
         // by using 1 m / s
-        return eval(travelTimeForVertex, 1000, 1000, null);
+        return eval(travelTimeForVertex, 1000, 1000, null, NO_TIME_LIMIT);
     }
 
     /// Calculate the total time needed to reach every point in this pointset (e.g. from an origin
     /// when evaluating direct, non-transit travel times). The total time includes time from origin
     /// split to vertices of destination edge, vertex of destination edge to destination split, and
     /// destination split to destination.
+    ///
+    /// The timeLimitSeconds is applied to that total time. A street search has applied a time limit
+    /// only up to the street vertices. The remaining travel along part of the destination edge and
+    /// from that edge to the destination point still needs to be constrained by the limit.
     ///
     /// @param timeToVertex   function returning the time required to reach a vertex, in seconds
     /// @param onStreetSpeed  speed at which the first/last edge is traversed, in millimeters per
@@ -461,29 +468,30 @@ public class LinkedPointSet implements Serializable {
     /// @param offStreetSpeed travel speed between the first/last edge and origin/target, in
     ///                       millimeters per second. Generally walking (we don't account for
     ///                       off-street parking not specified in OSM)
+    /// @param timeLimitSeconds max travel time allowed at destination points (or NO_TIME_LIMIT).
     /// @return wrapped int[] of travel times (in seconds) to reach the pointset points, with
     /// Integer.MAX_VALUE for unreached points.
     public PointSetTimes eval (
           CostToVertexFunction timeToVertex,
           int onStreetSpeed,
           int offStreetSpeed,
-          Split origin
+          Split origin,
+          int timeLimitSeconds
     ) {
-        return eval(timeToVertex, onStreetSpeed, offStreetSpeed, origin, null);
+        return eval(timeToVertex, onStreetSpeed, offStreetSpeed, origin, null, timeLimitSeconds);
     }
 
-    /// Like the four-argument [#eval], but clipped by the given place filter. It yields a time only
-    /// at points the filter accepts, leaving all other points unreached. Used for direct drop-off
-    /// by on-demand vehicles. Without clipping, vehicles would drive up to one block outside the
-    /// boundary. Every point is tested, so filter implementations are expected to reject quickly
-    /// (e.g. an envelope check before any real geometric work).
+    /// Like the public [#eval], but clipped by the given place filter and with no time limit.
+    /// Yields a time only at points the filter accepts, leaving all other points unreached. Used
+    /// for direct drop-off by on-demand vehicles. Without clipping, vehicles could drive one
+    /// block outside the boundary.
     public PointSetTimes evalClipped (
           CostToVertexFunction timeToVertex,
           int onStreetSpeed,
           int offStreetSpeed,
           OnDemandPlaceFilter place
     ) {
-        return eval(timeToVertex, onStreetSpeed, offStreetSpeed, null, place);
+        return eval(timeToVertex, onStreetSpeed, offStreetSpeed, null, place, NO_TIME_LIMIT);
     }
 
     /// Shared implementation for [#eval] and [#evalClipped]. Either or both of origin and place may
@@ -495,7 +503,8 @@ public class LinkedPointSet implements Serializable {
           int onStreetSpeed,
           int offStreetSpeed,
           Split origin,
-          OnDemandPlaceFilter place
+          OnDemandPlaceFilter place,
+          int timeLimitSeconds
     ) {
         int[] travelTimes = new int[edges.length];
         Arrays.fill(travelTimes, Integer.MAX_VALUE);
@@ -514,14 +523,19 @@ public class LinkedPointSet implements Serializable {
             if (place != null && !pointWithinPlace(i, place, edge, placeSplit)) {
                 continue;
             }
+            int travelTime;
             if (origin != null && origin.edge == edges[i]) {
                 // The target point lies along the same edge as the origin
                 int onStreetDistance_mm = Math.abs(origin.distance0_mm - distances0_mm[i]);
-                travelTimes[i] = origin.distanceToEdge_mm / offStreetSpeed +
+                travelTime = origin.distanceToEdge_mm / offStreetSpeed +
                       onStreetDistance_mm / edgeOnStreetSpeed + // along street
                       distancesToEdge_mm[i] / offStreetSpeed; // from destination split point to destination
             } else {
-                travelTimes[i] = timeToPoint(timeToVertex, edge, i, edgeOnStreetSpeed, offStreetSpeed);
+                travelTime = timeToPoint(timeToVertex, edge, i, edgeOnStreetSpeed, offStreetSpeed);
+            }
+            // Like street searches at vertices and egress propagation, time must be _below_ the limit.
+            if (travelTime < timeLimitSeconds) {
+                travelTimes[i] = travelTime;
             }
         }
         return new PointSetTimes(pointSet, travelTimes);
